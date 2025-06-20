@@ -1,8 +1,0 @@
-version: 2
-updates:
-
-  - package-ecosystem: "helm"
-    directory: "/"
-    schedule:
-      # Check for updates to Helm charts every weekday
-      interval: "weekly"
