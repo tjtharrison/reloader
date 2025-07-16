@@ -1,0 +1,185 @@
+---
+# Source: reloader/charts/reloader/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    meta.helm.sh/release-namespace: "kargo-reloader"
+    meta.helm.sh/release-name: "prod"
+  labels:
+    app: prod-reloader
+    chart: "reloader-2.1.4"
+    release: "prod"
+    heritage: "Helm"
+    app.kubernetes.io/managed-by: "Helm"
+  name: prod-reloader
+  namespace: kargo-reloader
+---
+# Source: reloader/charts/reloader/templates/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+
+kind: ClusterRole
+metadata:
+  annotations:
+    meta.helm.sh/release-namespace: "kargo-reloader"
+    meta.helm.sh/release-name: "prod"
+  labels:
+    app: prod-reloader
+    chart: "reloader-2.1.4"
+    release: "prod"
+    heritage: "Helm"
+    app.kubernetes.io/managed-by: "Helm"
+  name: prod-reloader-role
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+      - configmaps
+    verbs:
+      - list
+      - get
+      - watch
+  - apiGroups:
+      - "apps"
+    resources:
+      - deployments
+      - daemonsets
+      - statefulsets
+    verbs:
+      - list
+      - get
+      - update
+      - patch
+  - apiGroups:
+      - "batch"
+    resources:
+      - cronjobs
+    verbs:
+      - list
+      - get
+  - apiGroups:
+      - "batch"
+    resources:
+      - jobs
+    verbs:
+      - create
+      - delete
+      - list
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+---
+# Source: reloader/charts/reloader/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+
+kind: ClusterRoleBinding
+metadata:
+  annotations:
+    meta.helm.sh/release-namespace: "kargo-reloader"
+    meta.helm.sh/release-name: "prod"
+  labels:
+    app: prod-reloader
+    chart: "reloader-2.1.4"
+    release: "prod"
+    heritage: "Helm"
+    app.kubernetes.io/managed-by: "Helm"
+  name: prod-reloader-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prod-reloader-role
+subjects:
+  - kind: ServiceAccount
+    name: prod-reloader
+    namespace: kargo-reloader
+---
+# Source: reloader/charts/reloader/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    meta.helm.sh/release-namespace: "kargo-reloader"
+    meta.helm.sh/release-name: "prod"
+  labels:
+    app: prod-reloader
+    chart: "reloader-2.1.4"
+    release: "prod"
+    heritage: "Helm"
+    app.kubernetes.io/managed-by: "Helm"
+    group: com.stakater.platform
+    provider: stakater
+    version: v1.4.4
+  name: prod-reloader
+  namespace: kargo-reloader
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: prod-reloader
+      release: "prod"
+  template:
+    metadata:
+      labels:
+        app: prod-reloader
+        chart: "reloader-2.1.4"
+        release: "prod"
+        heritage: "Helm"
+        app.kubernetes.io/managed-by: "Helm"
+        group: com.stakater.platform
+        provider: stakater
+        version: v1.4.4
+    spec:
+      containers:
+      - image: "ghcr.io/stakater/reloader:v1.4.4"
+        imagePullPolicy: IfNotPresent
+        name: prod-reloader
+        env:
+        - name: GOMAXPROCS
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+              divisor: '1'
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+              divisor: '1'
+        ports:
+        - name: http
+          containerPort: 9090
+        livenessProbe:
+          httpGet:
+            path: /live
+            port: http
+          timeoutSeconds: 5
+          failureThreshold: 5
+          periodSeconds: 10
+          successThreshold: 1
+          initialDelaySeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: http
+          timeoutSeconds: 5
+          failureThreshold: 5
+          periodSeconds: 10
+          successThreshold: 1
+          initialDelaySeconds: 10
+
+        securityContext:
+          {}
+        args:
+          - "--log-level=info"
+      securityContext: 
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: prod-reloader
